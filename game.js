@@ -15,10 +15,10 @@ var Unit = function() {
     this.equip = [];
     for (var i=0;i<6;i++) {
         var newitem = new Item();
-        this.equip.push(newitem.id);
+        this.equip.push(newitem._id);
     }
     units.push({
-        "id": this._id,
+        "_id": this._id,
         "equip": this.equip
     });
 };
@@ -45,7 +45,6 @@ var create_party = function(db, callback) {
 };
 
 var load_party = function(db, partyid, callback) {
-    console.log("using partyid", partyid);
     if (!partyid) { //user has no partyid
         console.log("***CREATING NEW PARTY BECAUSE PARTYID WAS UNDEFINED***");
         create_party(db, function(newparty) {
@@ -83,7 +82,7 @@ var remove_user = function(username) {
 };
 
 var get_user = function(username) {
-    return users.filter(function(a) { return a.username = username; })[0];
+    return users.filter(function(a) { return a.username == username; })[0];
 };
 
 var add_party = function(party) {
@@ -91,7 +90,7 @@ var add_party = function(party) {
 };
 
 var get_party = function(partyid) {
-    return parties.filter(function(a) { return a.id = partyid; })[0];
+    return parties.filter(function(a) { return a._id == partyid; })[0];
 };
 
 module.exports = {
