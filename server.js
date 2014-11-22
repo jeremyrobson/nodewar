@@ -12,7 +12,6 @@ db = require('./database');
 var PATH = process.cwd();
 var pagesremaining = 0;
 var pages = {};
-var users = [];
 
 function render(res, data, locals) {
     res.writeHead(200, {'Context-Type': 'text/html'});
@@ -33,7 +32,6 @@ function redirect(res, address, cookiearray) {
 
 function validate_session(cookie, success, failure) {
     console.log("--------------SESSION VALIDATION--------------------");
-    console.log(users);
     console.log(cookie);
     
     var user;
@@ -66,8 +64,15 @@ function router(req, res) {
                         "username=" + username+"; ",
                         "sessionid=" + sessionid+"; "
                     ];
-                    game.add_user(username, sessionid);
-                    redirect(res, 'http://' + req.headers.host + '/client', cookiearray);
+                    game.load_party(db, data[0].partyid, function(party) {
+                        console.log(party);
+                        game.add_party(party);
+                        //make sure partyid matches user by overwriting it in database before redirect
+                        db.update("usercollection", {"username":username}, {"$set": {"partyid": party._id}}, function() {
+                            game.add_user(username, sessionid, party._id);
+                            redirect(res, 'http://' + req.headers.host + '/client', cookiearray);
+                        });
+                    });
                 }
                 else
                     render(res, pages["login"].data, {"error":"Username/Password incorrect!"});
@@ -92,7 +97,10 @@ function router(req, res) {
     var client = function() {
         var get = function(data) {
             validate_session(cookie, function() {
-                render(res, data, {"greeting": "hello " + "aweafv"});
+                var user = game.get_user(cookie.username);
+                var party = game.get_party(user.partyid);
+                console.log(party);
+                render(res, data, {"userdata": JSON.stringify(user, undefined, 2), "partydata": JSON.stringify(party, undefined, 2)});
             }, function() {
                 render(res, pages["login"].data, {"error":"Not logged in!"});
             });
@@ -171,8 +179,6 @@ function load_server() {
     load_page("error", ["error"], "error.html");
     load_page("client", ["client"], "client.jade");
     load_page("logout", ["logout"], "logout.jade");
-    
-    //console.log(game.create_party());
 }
 
 Object.prototype.keys = function() { var arr = []; for (var key in this) arr.push(key); return arr; };
