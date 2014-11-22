@@ -16,22 +16,40 @@ var connect = function(callback) {
     });
 };
 
-var find = function(collectionName, criteria, callback) {
+var find = function(collectionName, query, callback) {
     db.collection(collectionName, function(error, collection) {
-        if (error) console.log(error, "Collection not found");
-        else collection.find(criteria).toArray(function(error, data) {
+        if (error) console.log(error, "Collection " + collectionName + " not found");
+        else collection.find(query).toArray(function(error, data) {
             if (error) console.log(error, "Cannot convert data to array");
-            callback(data);
+            else callback(data);
         });
     });
 };
 
-var get_user = function(criteria, callback) {
-    
+var add_data = function(collectionName, data, callback) {
+    //db.createCollection(collectionName, function(error, collection) { });
+    db.collection(collectionName, function(error, collection) {
+        if (error) console.log(error, "Collection " + collectionName + " not found");
+        else collection.insert([data], function(error, docs) {
+            if (error) console.log(error, "Cannot insert data into collection");
+            else callback(docs);
+        });
+    });
+};
+
+var update = function(collectionName, query, data, callback) {
+    db.collection(collectionName, function(error, collection) {
+        if (error) console.log(error, "Collection " + collectionName + " not found");
+        else collection.update(query, data, function(error, docs) {
+            if (error) console.log(error, "Cannot update collection");
+            else callback();
+        });
+    });
 };
 
 module.exports = {
     connect: connect,
+    add_data: add_data,
     find: find,
-    get_user: get_user
+    update: update
 };
