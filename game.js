@@ -3,14 +3,13 @@ var parties = [];
 var units = [];
 var items = [];
 
-var Item = function() {
-    this._id = Math.random();
+var Item = function(unitid) {
+    this.unitid = unitid;
     this.name = Math.random();
     items.push(this);
 };
 
-var Unit = function() {
-    this._id = Math.random();
+var Unit = function(userid, partyid) {
     this.name = Math.random();
     this.equip = [];
     for (var i=0;i<6;i++) {
@@ -18,54 +17,74 @@ var Unit = function() {
         this.equip.push(newitem._id);
     }
     units.push({
-        "_id": this._id,
+        "userid": userid,
+        "partyid": partyid,
         "equip": this.equip
     });
 };
 
-var Party = function() {
+var add_unit = function(userid) {
+    
+};
+
+var Party = function(data) {
+    this.id = data._id;
+    this.userid = data.userid;
     this.units = [];
-    for (var i=0;i<5;i++) {
-        var newunit = new Unit();
-        this.units.push(newunit._id);
-    }
     parties.push({
+        "userid": data.userid,
         "units": this.units
     });
 };
 
+/*
+Party.prototype.to_json = function() {
+    return {
+        "userid": this.userid
+    };
+};
+*/
 
-var create_party = function(db, callback) {
-    var newparty = new Party();
-    db.add_data("partycollection", newparty, function(docs) {
-        newparty._id = docs[0]._id;
+var load_units = function(db, party, callback) {
+    db.find("unitcollection", {"partyid": this._id}, function(docs) {
+        party.units = docs; //fix
+        callback();
+    });
+};
+
+var create_party = function(db, userid, callback) {
+    db.add_data("partycollection", {"userid": userid}, function(docs) {
+        var newparty = new Party(docs[0]);
         parties.push(newparty);
         callback(newparty);
     });
 };
 
-var load_party = function(db, partyid, callback) {
-    if (!partyid) { //user has no partyid
-        console.log("***CREATING NEW PARTY BECAUSE PARTYID WAS UNDEFINED***");
-        create_party(db, function(newparty) {
-            callback(newparty);
-        });
-    }
-    else
-        db.find("partycollection", {"_id": partyid}, function(data) {
-            if (data.length == 0) { //partyid not found
-                console.log("***CREATING NEW PARTY BECAUSE PARTYID WAS NOT FOUND IN DB***");
-                create_party(db, function(newparty) {
-                    callback(newparty);
-                });
-            }
-            else
-                callback(data[0]); //partyid found
-        });
+var load_party = function(db, userid, callback) {
+    db.find("partycollection", {"userid": userid}, function(docs) {
+        if (docs.length == 0) { //party not found
+            console.log("***CREATING NEW PARTY BECAUSE userid WAS NOT FOUND IN partycollection***");
+            create_party(db, userid, function(newparty) {
+                callback(newparty);
+            });
+        }
+        else {
+            var party = new Party(docs[0]); //todo: choose from multiple parties?
+            load_units(db, party, function() {
+                callback(party);
+            });
+        }
+    });
+};
+
+var create_user = function(db, username, password, callback) {
+    db.add_data("usercollection", {"username":username, "password":password}, function() {
+        callback();
+    });
 };
 
 var add_user = function(username, sessionid, partyid) {
-    users.push({"username":username, "sessionid": sessionid, "partyid": partyid});
+    users.push({"username":username, "sessionid": sessionid});
     console.log("-------------------CURRENT USERS------------------------");
     console.log(users);
 };
@@ -85,22 +104,14 @@ var get_user = function(username) {
     return users.filter(function(a) { return a.username == username; })[0];
 };
 
-var add_party = function(party) {
-    parties.push(party);
-};
-
-var get_party = function(partyid) {
-    return parties.filter(function(a) { return a._id == partyid; })[0];
-};
-
 module.exports = {
     create_party: create_party,
     load_party: load_party,
+    create_user: create_user,
     add_user: add_user,
     find_user: find_user,
     remove_user: remove_user,
     get_user: get_user,
-    add_party: add_party,
-    get_party: get_party,
+    //get_party: get_party,
     users: users
 };
