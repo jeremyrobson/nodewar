@@ -2,8 +2,26 @@ doctype html
 html(lang="en")
   head
     title= pageTitle
+    script(type='text/javascript', src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js')
+    script(type='text/javascript').
+      $(document).ready(function() {
+        $("#addunitbutton").click(function() {
+          $.ajax({
+            type: 'GET',
+            url: '/client',
+            data: { jsonData: JSON.stringify({"command":"adduser"}) },
+            dataType: 'json',
+            complete: function(data) {
+              $("#unittable").after("<tr>"+data+"</tr>");
+            }
+          });
+        });
+      });
   body
     h1 Client
     h2 #{userdata}
-    h2 #{partydata}
+    table(id="unittable")
+      tr
+        td unit
+    button(id="addunitbutton") add unit
     a(href="/logout") logout
