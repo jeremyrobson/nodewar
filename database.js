@@ -37,6 +37,10 @@ var add_data = function(collectionName, data, callback) {
     });
 };
 
+//db.update("usercollection", {"username":username}, {"$set": {"partyid": party._id}}, function() {
+    
+//});
+
 var update = function(collectionName, query, data, callback) {
     db.collection(collectionName, function(error, collection) {
         if (error) console.log(error, "Collection " + collectionName + " not found");
