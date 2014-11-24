@@ -14,6 +14,7 @@ var pagesremaining = 0;
 var pages = {};
 
 function render(res, template, locals) {
+    //todo: prevent locals from containing escaping chars
     res.writeHead(200, {'Context-Type': 'text/html'});
     res.write(jade.render(template, locals));
     res.end();
@@ -28,6 +29,11 @@ function redirect(res, address, cookiearray) {
     headers.push(['Location',address]);
     res.writeHead(301, headers);
     res.end();
+}
+
+function respond(res, data) {
+    res.writeHead(200, {"Content-Type": "text/json"}); //, "Access-Control-Allow-Origin": "*"});
+    res.end(JSON.stringify(data));
 }
 
 function validate_session(cookie, success, failure) {
@@ -57,27 +63,18 @@ function router(req, res) {
         var post = function(data) {
             var username = data.usernameinput;
             var password  = data.passwordinput;
-            db.find("usercollection", {"username": username}, function(userlist) {
-                if (userlist[0] && userlist[0].password == password) {
-                    var sessionid = uuid.v1();
-                    var cookiearray = ["username=" + username+"; ","sessionid=" + sessionid+"; "];
-                    game.load_party(db, userlist[0]._id, function(party) {
-                        console.log(party);
-                        game.add_user(username, sessionid, party);
-                        redirect(res, 'http://' + req.headers.host + '/client', cookiearray);
-                        
-                        //db.update("usercollection", {"username":username}, {"$set": {"partyid": party._id}}, function() {
-                            
-                        //});
-                    });
-                }
-                else if (userlist[0] && userlist[0].password != password)
+            game.validate_user(db, username, password, function(user) { //user found
+                user.sessionid = uuid.v1();
+                var cookiearray = ["username=" + username+"; ","sessionid=" + user.sessionid+"; "];
+                redirect(res, 'http://' + req.headers.host + '/client', cookiearray);
+            },
+            function(errorcode) {
+                if (errorcode == 401) //password incorrect
                     render(res, pages["login"].template, {"error":"Username/Password incorrect!"});
-                else
-                    game.create_user(db, username, password, function() {
-                        var sessionid = uuid.v1();
-                        var cookiearray = ["username=" + username+"; ","sessionid=" + sessionid+"; "];
-                        game.add_user(username, sessionid, null);
+                else if (errorcode == 400) //user does not exist
+                    game.create_user(db, username, password, function(user) {
+                        user.sessionid = uuid.v1();
+                        var cookiearray = ["username=" + username+"; ","sessionid=" + user.sessionid+"; "];
                         redirect(res, 'http://' + req.headers.host + '/client', cookiearray);
                     });
             });
@@ -101,12 +98,18 @@ function router(req, res) {
     var client = function() {
         var get = function(query) {
             var fn;
-            if (query && query.command == "adduser")
-                fn = function() { console.log("ADDDDDDDDDDDDDUNNNNNNNNNNNIT"); };
+            if (query && query.command == "addunit") {
+                var user = game.get_user(cookie.username);
+                fn = function() {
+                    game.create_unit(db, user, function(newunit) {
+                        respond(res, newunit);
+                    }); 
+                };
+            }
             else
                 fn = function() {
                     var user = game.get_user(cookie.username);
-                    render(res, pages["client"].template, {"userdata": JSON.stringify(user, undefined, 2)});
+                    render(res, pages["client"].template, {userdata: JSON.stringify(user)});
                 };
             validate_session(cookie, fn, function() {
                 render(res, pages["login"].template, {"error":"Not logged in!"});
@@ -144,12 +147,12 @@ function start_server() {
         var query = (uri.query.jsonData) ? JSON.parse(uri.query.jsonData) : {};
         var p = params[0];
         var page = (pages[p]) ? pages[p] : pages['login'];
-        console.log(req.method + " ... " + p + " ... " +  page.route);
+        console.log(req.method + " ... " + p + " ... " +  page.pathname);
         
         var route = router(req, res);
         
         if (req.method == 'GET') {
-            var get = route[page.route]()['get'];
+            var get = route[page.pathname]()['get'];
             get(query);
         }
         if (req.method == 'POST') {
@@ -160,14 +163,14 @@ function start_server() {
             });
             req.on('end', function() {
                 var data = qs.parse(body);
-                route[page.route]()['post'](data);
+                route[page.pathname]()['post'](data);
             });
         }
     }).listen(1337, '127.0.0.1');
     console.log('Server running at http://127.0.0.1:1337/');
 }
 
-function load_page(route, keys, filename) {
+function load_page(pathname, keys, filename) {
     pagesremaining++;
     fs.readFile(path.join(PATH, '\\' + filename), {encoding: 'utf8', flag: 'r'}, function (err, data) {
         if (err) throw err;
@@ -175,7 +178,7 @@ function load_page(route, keys, filename) {
             pages[key] = {
                 filename: filename,
                 template: data,
-                route: route
+                pathname: pathname
             };
         });
         pagesremaining--;
