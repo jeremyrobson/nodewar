@@ -4,22 +4,25 @@ html(lang="en")
     title= pageTitle
     script(type='text/javascript', src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js')
     script(type='text/javascript').
+      var userdata = !{userdata};
       $(document).ready(function() {
+        $("#userdata").html(userdata.username);
         $("#addunitbutton").click(function() {
           $.ajax({
             type: 'GET',
             url: '/client',
-            data: { jsonData: JSON.stringify({"command":"adduser"}) },
+            data: { jsonData: JSON.stringify({"command":"addunit"}) },
             dataType: 'json',
             complete: function(data) {
-              $("#unittable").after("<tr>"+data+"</tr>");
+              var unit = data.responseJSON;
+              $("#unittable").after("<tr><td>"+unit.name+"</td></tr>");
             }
           });
         });
       });
   body
     h1 Client
-    h2 #{userdata}
+    div(id="userdata")
     table(id="unittable")
       tr
         td unit
