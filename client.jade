@@ -2,29 +2,68 @@ doctype html
 html(lang="en")
   head
     title= pageTitle
+    style(type='text/css').
+      #error {
+        font-size: 15px;
+        color: #ff0000;
+      }
     script(type='text/javascript', src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js')
     script(type='text/javascript').
       var userdata = !{userdata};
-      $(document).ready(function() {
-        $("#userdata").html(userdata.username);
-        $("#addunitbutton").click(function() {
-          $.ajax({
-            type: 'GET',
-            url: '/client',
-            data: { jsonData: JSON.stringify({"command":"addunit"}) },
-            dataType: 'json',
-            complete: function(data) {
-              var unit = data.responseJSON;
-              $("#unittable").after("<tr><td>"+unit.name+"</td></tr>");
-            }
+      
+      function ajax_request(url, header, data, callback) {
+        $.ajax({
+          type: 'GET',
+          url: url,
+          data: { jsonData: JSON.stringify({"header":header, "data": data}) },
+          dataType: 'json',
+          complete: callback
+        });
+      }
+      
+      function remove_unit(el) {
+        console.log(el);
+        ajax_request("/client", "removeunit", "WTFFFFFFFFFFFFFFF", function(data) {
+          console.log(data);
+        });
+      }
+      
+      function refresh_party() {
+        ajax_request("/client", "getparty", null, function(data) {
+          $("#unittable tr").remove();
+          var party = data.responseJSON;
+          party.unitlist.forEach(function(unit) {
+            $("#unittable tbody").append("<tr><td>"+unit.name+"</td><td><a href='javascript:remove_unit(this)'>remove</a></td></tr>");
           });
         });
+      }
+      
+      function add_unit() {
+        ajax_request("/client", "addunit", null, function(data) {
+          if (data.responseJSON.header == "newunit") {
+            console.log(data.responseJSON);
+            refresh_party();
+          }
+          else {
+            $("#error").html("Reached maximum users.");
+          }
+        });
+      }
+      
+      $(document).ready(function() {
+        $("#userdata").html("<h2>Welcome, " + userdata.username + ".</h2>");
+        $("#addunitbutton").click(add_unit);
+        $("#refreshpartybutton").click(refresh_party);
+        refresh_party();
       });
   body
     h1 Client
     div(id="userdata")
     table(id="unittable")
       tr
-        td unit
+        td
+          h3 Party
+    button(id="refreshpartybutton") refresh party
     button(id="addunitbutton") add unit
     a(href="/logout") logout
+    div(id="error")
