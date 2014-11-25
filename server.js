@@ -97,18 +97,31 @@ function router(req, res) {
     
     var client = function() {
         var get = function(query) {
+            var user = game.get_user(cookie.username);
             var fn;
-            if (query && query.command == "addunit") {
-                var user = game.get_user(cookie.username);
+            if (query && query.header == "addunit") {
                 fn = function() {
                     game.create_unit(db, user, function(newunit) {
-                        respond(res, newunit);
+                        if (newunit) respond(res, newunit);
+                        else respond(res, {"error": "Cannot add more units."});
                     }); 
+                };
+            }
+            else if (query && query.header == "getparty") {
+                fn = function() {
+                    game.get_party(user, function(party) {
+                        respond(res, party);
+                    });
+                };
+            }
+            else if (query && query.header == "removeunit") {
+                console.log(query.data);
+                fn = function() {
+                    respond(res, query.data);
                 };
             }
             else
                 fn = function() {
-                    var user = game.get_user(cookie.username);
                     render(res, pages["client"].template, {userdata: JSON.stringify(user)});
                 };
             validate_session(cookie, fn, function() {
