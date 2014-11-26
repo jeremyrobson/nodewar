@@ -7,6 +7,11 @@ html(lang="en")
         font-size: 15px;
         color: #ff0000;
       }
+      
+      .clsunitdiv {
+        display: none;
+      }
+      
     script(type='text/javascript', src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js')
     script(type='text/javascript').
       var userdata = !{userdata};
@@ -21,20 +26,44 @@ html(lang="en")
         });
       }
       
-      function remove_unit(el) {
-        console.log(el);
-        ajax_request("/client", "removeunit", "WTFFFFFFFFFFFFFFF", function(data) {
-          console.log(data);
+      function remove_unit() {
+        var index = $(".clsremoveunit").index(this)
+        ajax_request("/client", "removeunit", "removing unit " + index, function(data) {
+          console.log(data.responseJSON);
         });
+      }
+      
+      function toggle_unit() {
+        var index = $(".clstoggleunit").index(this);
+        $(".clsunitdiv:eq("+index+")").slideToggle();
       }
       
       function refresh_party() {
         ajax_request("/client", "getparty", null, function(data) {
           $("#unittable tr").remove();
           var party = data.responseJSON;
-          party.unitlist.forEach(function(unit) {
-            $("#unittable tbody").append("<tr><td>"+unit.name+"</td><td><a href='javascript:remove_unit(this)'>remove</a></td></tr>");
+          party.unitlist.forEach(function(unit, i) {
+            $("#unittable tbody").append("\
+              <tr>\
+                <td>\
+                  <div>\
+                    <a class='clstoggleunit' href='javascript:void(0)'>"+unit.name+"</a>\
+                  </div>\
+                  <div class='clsunitdiv'>"+
+                    unit._id
+                  +"</div>\
+                </td>\
+                <td>\
+                  <a class='clsequipunit' href='\equip?index=" + i + "'>equip</a>\
+                </td>\
+                <td>\
+                  <a class='clsremoveunit' href='javascript:void(0)'>remove</a>\
+                </td>\
+              </tr>\
+            ");
           });
+          $(".clstoggleunit").click(toggle_unit);
+          $(".clsremoveunit").click(remove_unit);
         });
       }
       
@@ -59,11 +88,11 @@ html(lang="en")
   body
     h1 Client
     div(id="userdata")
-    table(id="unittable")
+    #[a(href="/logout") logout]
+    table(id="unittable", border="1")
       tr
         td
           h3 Party
     button(id="refreshpartybutton") refresh party
     button(id="addunitbutton") add unit
-    a(href="/logout") logout
     div(id="error")
