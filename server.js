@@ -125,7 +125,7 @@ function router(req, res) {
                     render(res, pages["client"].template, {userdata: JSON.stringify(user)});
                 };
             validate_session(cookie, fn, function() {
-                render(res, pages["login"].template, {"error":"Not logged in!"});
+                render(res, pages["login"].template, {"error":"You session has expired!"});
             });
         };
         var post = function(data) {
@@ -134,9 +134,41 @@ function router(req, res) {
         return { get: get, post: post };
     };
     
-    var user = function() {
+    var equip = function() {
         var get = function(query) {
-            
+            var user = game.get_user(cookie.username);
+            var index = query.index;
+            var unit = (user) ? user.party.unitlist[index] : null;
+            console.log("QUUUUUUUEEEEEEEERRRRRRYYYYYYYYY", query);
+            var fn;
+            if (query && query.header == "additem") {
+                fn = function() {
+                    game.create_item(db, unit, function(newunit) {
+                        if (newitem) respond(res, newitem);
+                        else respond(res, {"error": "Cannot add more items."});
+                    }); 
+                };
+            }
+            else if (query && query.header == "dropitem") {
+                fn = function() {
+                    game.get_party(user, function(party) {
+                        respond(res, party);
+                    });
+                };
+            }
+            else if (query && query.header == "removeitem") {
+                console.log(query.data);
+                fn = function() {
+                    respond(res, query.data);
+                };
+            }
+            else
+                fn = function() {
+                    render(res, pages["equip"].template, {unitdata: JSON.stringify(unit), unitindex: index});
+                };
+            validate_session(cookie, fn, function() {
+                render(res, pages["login"].template, {"error":"Your session has expired!"});
+            });
         };
         var post = function(data) {
             
@@ -147,7 +179,8 @@ function router(req, res) {
     return {
         login: login,
         logout: logout,
-        client: client
+        client: client,
+        equip: equip
     };
 }
 
@@ -157,11 +190,10 @@ function start_server() {
     http.createServer(function (req, res) {
         var uri = url.parse(req.url, true);
         var params = uri.pathname.split("/").filter(function(a) { if (a!='') return a; });
-        var query = (uri.query.jsonData) ? JSON.parse(uri.query.jsonData) : {};
+        var query = (uri.query.jsonData) ? JSON.parse(uri.query.jsonData) : uri.query;
         var p = params[0];
         var page = (pages[p]) ? pages[p] : pages['login'];
         console.log(req.method + " ... " + p + " ... " +  page.pathname);
-        
         var route = router(req, res);
         
         if (req.method == 'GET') {
@@ -203,6 +235,7 @@ function load_server() {
     load_page("login", ["login"], "login.jade");
     load_page("error", ["error"], "error.html");
     load_page("client", ["client"], "client.jade");
+    load_page("equip", ["equip"], "equip.jade");
     load_page("logout", ["logout"], "logout.jade");
 }
 
