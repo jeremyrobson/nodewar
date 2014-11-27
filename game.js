@@ -5,6 +5,7 @@ var items = [];
 
 var Item = function(doc) {
     this.name = doc.name;
+    this._id = doc._id;
     this.unitid = doc.unitid;
     items.push(this);
 };
@@ -24,32 +25,36 @@ var get_item_template = function(unit) {
 };
 
 var create_item = function(db, unit, callback) {
-    console.log("-----------------CREATING ITEM----------------------");
-    console.log("UNIT:", unit);
-    db.add_data("unitcollection", get_unit_template(unit), function(docs) {
-        var newunit = new Unit(docs[0]);
-        callback(newunit);
-    });
+    if (unit.equip.length < 10) {
+        console.log("-----------------CREATING ITEM----------------------");
+        console.log("UNIT", unit);
+        db.add_data("itemcollection", get_item_template(unit), function(docs) {
+            var newitem = new Item(docs[0]);
+            unit.equip.push(newitem);
+            callback(newitem);
+        });
+    }
+    else //reached maximum items
+        callback(false);
 };
 
 var load_items = function(db, unitids, callback) {
-    
-    db.find("unitcollection", {"unitid": {"$in": unitids}}, function(itemdocs) {
-        var itemlist = itemdocs.map(function(doc) { return new Item(doc, unitid); });
+    db.find("itemcollection", {"unitid": {"$in": unitids}}, function(itemdocs) {
+        var itemlist = itemdocs.map(function(doc) { return new Item(doc); });
         callback(itemlist);
     });
 };
 
-var Unit = function(doc) {
+var get_items = function(unit, callback) {
+    callback(unit.equip);
+};
+
+var Unit = function(doc, userid, partyid, itemlist) {
     this.name = doc.name;
     this._id = doc._id;
-    this.userid = doc.userid;
-    this.partyid = doc.partyid;
-    this.equip = [];
-    for (var i=0;i<6;i++) {
-        var newitem = new Item({"name":"DEFAULT ITEM","unitid":"blah"});
-        this.equip.push(newitem); //todo
-    }
+    this.userid = userid || doc.userid;
+    this.partyid = partyid || doc.partyid;
+    this.equip = itemlist || [];
     units.push(this);
 };
 
@@ -145,6 +150,10 @@ var load_party = function(db, userid, callback) {
     });
 };
 
+var get_party = function(user, callback) {
+    callback(user.party);
+};
+
 var User = function(doc, party) {
     this.username = doc.username;
     this._id = doc._id;
@@ -177,10 +186,6 @@ var get_user = function(username) {
     return users.filter(function(a) { return a.username == username; })[0];
 };
 
-var get_party = function(user, callback) {
-    callback(user.party);
-};
-
 var validate_user = function(db, username, password, success, failure) {
     db.find("usercollection", {"username": username}, function(docs) {
         if (docs[0] && docs[0].password == password) {
@@ -197,6 +202,8 @@ var validate_user = function(db, username, password, success, failure) {
 };
 
 module.exports = {
+    create_item: create_item,
+    get_items: get_items,
     create_unit: create_unit,
     create_party: create_party,
     load_party: load_party,
