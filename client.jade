@@ -41,7 +41,8 @@ html(lang="en")
       function refresh_party() {
         ajax_request("/client", "getparty", null, function(data) {
           $("#unittable tr").remove();
-          var party = data.responseJSON;
+          console.log(data.responseJSON);
+          var party = data.responseJSON.data;
           party.unitlist.forEach(function(unit, i) {
             $("#unittable tbody").append("\
               <tr>\
@@ -54,7 +55,7 @@ html(lang="en")
                   +"</div>\
                 </td>\
                 <td>\
-                  <a class='clsequipunit' href='\equip?index=" + i + "'>equip</a>\
+                  <a class='clsequipunit' href='\equip?unitindex=" + i + "'>equip</a>\
                 </td>\
                 <td>\
                   <a class='clsremoveunit' href='javascript:void(0)'>remove</a>\
@@ -69,6 +70,7 @@ html(lang="en")
       
       function add_unit() {
         ajax_request("/client", "addunit", null, function(data) {
+          console.log(data.responseJSON);
           if (data.responseJSON.header == "newunit") {
             console.log(data.responseJSON);
             refresh_party();
@@ -87,12 +89,13 @@ html(lang="en")
       });
   body
     h1 Client
-    div(id="userdata")
-    #[a(href="/logout") logout]
-    table(id="unittable", border="1")
-      tr
-        td
-          h3 Party
-    button(id="refreshpartybutton") refresh party
-    button(id="addunitbutton") add unit
-    div(id="error")
+    #content
+      #userdata
+      a(href="/logout") logout
+      table(id="unittable", border="1")
+        tr
+          td
+            h3 Party
+      button(id="refreshpartybutton") refresh party
+      button(id="addunitbutton") add unit
+    #error
