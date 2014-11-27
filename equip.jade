@@ -33,10 +33,10 @@ html(lang="en")
       }
       
       function refresh_items() {
-        ajax_request("/equip?unitindex="+unitindex, "getparty", null, function(data) {
-          console.log("responseJSON", data.responseJSON); 
+        ajax_request("/equip?unitindex="+unitindex, "getitems", null, function(data) {
+          console.log(data.responseJSON.data); 
           $("#itemtable tr").remove();
-          var itemlist = data.responseJSON || [{"name":"Empty", "_id":-1}];
+          var itemlist = (data.responseJSON.data.length) ? data.responseJSON.data : [{"name":"Empty", "_id":-1}];
           itemlist.forEach(function(item, i) {
             $("#itemtable tbody").append("\
               <tr>\
@@ -83,12 +83,13 @@ html(lang="en")
       });
   body
     h1 Client
-    div(id="unitdata")
-    #[a(href="/client") back] | #[a(href="/logout") logout]
-    table(id="itemtable", border="1")
-      tr
-        td
-          h3 Inventory
-    button(id="refreshitemsbutton") refresh inventory
-    button(id="additembutton") add item
-    div(id="error")
+    #content
+      #unitdata
+      #[a(href="/client") back] | #[a(href="/logout") logout]
+      table(id="itemtable", border="1")
+        tr
+          td
+            h3 Inventory
+      button(id="refreshitemsbutton") refresh inventory
+      button(id="additembutton") add item
+    #error
