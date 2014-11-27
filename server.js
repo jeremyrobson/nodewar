@@ -31,8 +31,9 @@ function redirect(res, address, cookiearray) {
     res.end();
 }
 
-function respond(res, data) {
+function respond(res, data) { //responding to ajax gets
     res.writeHead(200, {"Content-Type": "text/json"}); //, "Access-Control-Allow-Origin": "*"});
+    console.log("HERE IS WHAT IM SENDING!!!", data);
     res.end(JSON.stringify(data));
 }
 
@@ -44,10 +45,8 @@ function validate_session(cookie, success, failure) {
     if (cookie.username && cookie.sessionid)
         user = game.find_user(cookie.username);
     
-    if (user && user.sessionid == cookie.sessionid)
-        success(); //already in session
-    else
-        failure();  //no session
+    if (user && user.sessionid == cookie.sessionid) success(); //already in session
+    else failure();  //no session
 }
 
 function router(req, res) {
@@ -88,7 +87,7 @@ function router(req, res) {
                 console.log(cookie.username + " is logging out");
                 game.remove_user(cookie.username);
             }, function() {
-                render(res, pages["login"].template, {"error":"Not logged in!"});
+                render(res, pages["login"].template, {"header":"error", "data":"Not logged in!"});
             });
             render(res, pages["logout"].template, "");
         };
@@ -96,36 +95,36 @@ function router(req, res) {
     };
     
     var client = function() {
-        var get = function(query) {
+        var get = function(query, ajaxdata) {
             var user = game.get_user(cookie.username);
-            var fn;
-            if (query && query.header == "addunit") {
-                fn = function() {
+            var success;
+            if (ajaxdata && ajaxdata.header == "addunit") {
+                success = function() {
                     game.create_unit(db, user, function(newunit) {
-                        if (newunit) respond(res, newunit);
-                        else respond(res, {"error": "Cannot add more units."});
-                    }); 
-                };
-            }
-            else if (query && query.header == "getparty") {
-                fn = function() {
-                    game.get_party(user, function(party) {
-                        respond(res, party);
+                        if (newunit) respond(res, {"header":"newunit", "data":newunit});
+                        else respond(res, {"header":"error", "data":"Cannot add more units."});
                     });
                 };
             }
-            else if (query && query.header == "removeunit") {
-                console.log(query.data);
-                fn = function() {
-                    respond(res, query.data);
+            else if (ajaxdata && ajaxdata.header == "getparty") {
+                success = function() {
+                    game.get_party(user, function(party) {
+                        respond(res, {"header":"party", "data":party});
+                    });
                 };
             }
-            else
-                fn = function() {
+            else if (ajaxdata && ajaxdata.header == "removeunit") {
+                console.log(ajaxdata.data);
+                success = function() {
+                    respond(res, ajaxdata.data);
+                };
+            }
+            else //if no ajaxdata, send userdata
+                success = function() {
                     render(res, pages["client"].template, {userdata: JSON.stringify(user)});
                 };
-            validate_session(cookie, fn, function() {
-                render(res, pages["login"].template, {"error":"You session has expired!"});
+            validate_session(cookie, success, function() {
+                render(res, pages["login"].template, {"header":"error", "data":"Your session has expired!"});
             });
         };
         var post = function(data) {
@@ -135,39 +134,45 @@ function router(req, res) {
     };
     
     var equip = function() {
-        var get = function(query) {
+        var get = function(query, ajaxdata) {
             var user = game.get_user(cookie.username);
-            var index = query.index;
+            var index = query.unitindex;
             var unit = (user) ? user.party.unitlist[index] : null;
-            console.log("QUUUUUUUEEEEEEEERRRRRRYYYYYYYYY", query);
-            var fn;
-            if (query && query.header == "additem") {
-                fn = function() {
-                    game.create_item(db, unit, function(newunit) {
-                        if (newitem) respond(res, newitem);
-                        else respond(res, {"error": "Cannot add more items."});
+            var success;
+            if (ajaxdata && ajaxdata.header == "additem") {
+                success = function() {
+                    game.create_item(db, unit, function(newitem) {
+                        if (newitem) respond(res, {"header":"newitem", "data":newitem});
+                        else respond(res, {"header":"error", "data":"Cannot add more items."});
                     }); 
                 };
             }
-            else if (query && query.header == "dropitem") {
-                fn = function() {
+            else if (ajaxdata && ajaxdata.header == "getitems") {
+                success = function() {
+                    game.get_items(unit, function(itemlist) {
+                        respond(res, {"header":"itemlist", "data":itemlist});
+                    });
+                };
+            }
+            else if (ajaxdata && ajaxdata.header == "dropitem") {
+                success = function() {
                     game.get_party(user, function(party) {
                         respond(res, party);
                     });
                 };
             }
-            else if (query && query.header == "removeitem") {
-                console.log(query.data);
-                fn = function() {
-                    respond(res, query.data);
+            else if (ajaxdata && ajaxdata.header == "removeitem") {
+                console.log(ajaxdata.data);
+                success = function() {
+                    respond(res, ajaxdata.data);
                 };
             }
-            else
-                fn = function() {
+            else //if no ajaxdata, send unitdata and unitindex
+                success = function() {
                     render(res, pages["equip"].template, {unitdata: JSON.stringify(unit), unitindex: index});
                 };
-            validate_session(cookie, fn, function() {
-                render(res, pages["login"].template, {"error":"Your session has expired!"});
+            validate_session(cookie, success, function() {
+                render(res, pages["login"].template, {"header":"error", "data":"Your session has expired!"});
             });
         };
         var post = function(data) {
@@ -190,15 +195,15 @@ function start_server() {
     http.createServer(function (req, res) {
         var uri = url.parse(req.url, true);
         var params = uri.pathname.split("/").filter(function(a) { if (a!='') return a; });
-        var query = (uri.query.jsonData) ? JSON.parse(uri.query.jsonData) : uri.query;
+        var query = uri.query; //ajax jsondata becomes part of GET query!
+        var ajaxdata = (query.jsonData) ? JSON.parse(query.jsonData) : "";
         var p = params[0];
         var page = (pages[p]) ? pages[p] : pages['login'];
-        console.log(req.method + " ... " + p + " ... " +  page.pathname);
         var route = router(req, res);
         
         if (req.method == 'GET') {
             var get = route[page.pathname]()['get'];
-            get(query);
+            get(query, ajaxdata);
         }
         if (req.method == 'POST') {
             var body = '';
