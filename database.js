@@ -7,12 +7,14 @@ var db;
 var connect = function(callback) {
     mc.open(function(err, mc) {
         if (!mc) {
+            process.exit(1); //remove this line if callback is to continue with starting server
             console.log(err);
-            process.exit(1);
         }
-        db = mc.db("nodewar1");
-        console.log("Connected to mongodb");
-        callback();
+        else {
+            db = mc.db("nodewar1");
+            console.log("Connected to mongodb");
+        }
+        callback(err);
     });
 };
 
