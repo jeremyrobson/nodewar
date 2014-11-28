@@ -1,2 +1,2 @@
-"F:\nodejs\node" "F:\js\nodewar2\server.js"
+"F:\nodejs\node" "F:\js\nodewar2\app.js"
 pause
