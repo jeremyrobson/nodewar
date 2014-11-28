@@ -1,3 +1,6 @@
+var db = require("./database"),
+uuid = require('node-uuid');
+
 var users = [];
 var parties = [];
 var units = [];
@@ -24,7 +27,7 @@ var get_item_template = function(unit) {
     };
 };
 
-var create_item = function(db, unit, callback) {
+var create_item = function(unit, callback) {
     if (unit.equip.length < 10) {
         console.log("-----------------CREATING ITEM----------------------");
         console.log("UNIT", unit);
@@ -38,7 +41,7 @@ var create_item = function(db, unit, callback) {
         callback(false);
 };
 
-var load_items = function(db, unitids, callback) {
+var load_items = function(unitids, callback) {
     db.find("itemcollection", {"unitid": {"$in": unitids}}, function(itemdocs) {
         var itemlist = itemdocs.map(function(doc) { return new Item(doc); });
         callback(itemlist);
@@ -74,7 +77,7 @@ var get_unit_template = function(user) {
     };
 };
 
-var create_unit = function(db, user, callback) {
+var create_unit = function(user, callback) {
     if (user.party.unitlist.length < 5) {
         console.log("-----------------CREATING UNIT----------------------");
         console.log("USER", user);
@@ -101,10 +104,10 @@ Party.prototype.to_json = function() {
     };
 };
 
-var load_units = function(db, userid, partyid, callback) {
+var load_units = function(userid, partyid, callback) {
     db.find("unitcollection", {"partyid": partyid}, function(unitdocs) {
         var unitids = unitdocs.map(function(a) { return a._id; }); //get list of unitids
-        load_items(db, unitids, function(itemlist) { //query itemcollection for ALL unitids
+        load_items(unitids, function(itemlist) { //query itemcollection for ALL unitids
             unitdocs.forEach(function(a) { //sort items into respective units
                 a.equip = itemlist.filter(function(b) {
                     return a._id == b.unitid;
@@ -123,7 +126,7 @@ var get_party_template = function(user) {
     };
 };
 
-var create_party = function(db, userid, callback) {
+var create_party = function(userid, callback) {
     db.add_data("partycollection", get_party_template(userid), function(docs) {
         var newparty = new Party(docs[0]);
         parties.push(newparty);
@@ -131,18 +134,18 @@ var create_party = function(db, userid, callback) {
     });
 };
 
-var load_party = function(db, userid, callback) {
+var load_party = function(userid, callback) {
     db.find("partycollection", {"userid": userid}, function(partydocs) {
         if (partydocs.length == 0) { //party not found
             console.log("***CREATING NEW PARTY BECAUSE userid WAS NOT FOUND IN partycollection***");
-            create_party(db, userid, function(newparty) {
+            create_party(userid, function(newparty) {
                 var party = new Party(partydocs[0], []);
                 callback(party);
             });
         }
         else {
             var party = new Party(partydocs[0]);
-            load_units(db, userid, partydocs[0]._id, function(unitlist) {
+            load_units(userid, partydocs[0]._id, function(unitlist) {
                 var party = new Party(partydocs[0], unitlist);
                 callback(party);
             });
@@ -164,9 +167,10 @@ var User = function(doc, party) {
     console.log(users);
 };
 
-var create_user = function(db, username, password, callback) {
+var create_user = function(username, password, callback) {
     db.add_data("usercollection", {"username":username, "password":password}, function(docs) {
         var newuser = new User(docs[0]);
+        newuser.sessionid = uuid.v1();
         callback(newuser);
     });
 };
@@ -186,11 +190,12 @@ var get_user = function(username) {
     return users.filter(function(a) { return a.username == username; })[0];
 };
 
-var validate_user = function(db, username, password, success, failure) {
+var validate_user = function(username, password, success, failure) {
     db.find("usercollection", {"username": username}, function(docs) {
         if (docs[0] && docs[0].password == password) {
-            load_party(db, docs[0]._id, function(party) {
+            load_party(docs[0]._id, function(party) {
                 var user = new User(docs[0], party);
+                user.sessionid = uuid.v1();
                 success(user);   
             });
         }
@@ -201,7 +206,14 @@ var validate_user = function(db, username, password, success, failure) {
     });
 };
 
+var init = function(callback) {
+    db.connect(function() {
+        callback();
+    });
+};
+
 module.exports = {
+    init: init,
     create_item: create_item,
     get_items: get_items,
     create_unit: create_unit,
