@@ -1,0 +1,104 @@
+doctype html
+html(lang="en")
+  head
+    title= pageTitle
+    style(type='text/css').
+      #error {
+        font-size: 15px;
+        color: #ff0000;
+      }
+      
+      .clsunitdiv {
+        display: none;
+      }
+      
+    script(type='text/javascript', src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js')
+    script(type='text/javascript').
+      var userdata = !{userdata};
+      
+      function ajax_request(url, header, data, callback) {
+        $.ajax({
+          type: 'GET',
+          url: url,
+          data: { jsonData: JSON.stringify({"header":header, "data": data}) },
+          dataType: 'json',
+          complete: callback,
+          error: callback({"responseJSON":{"data":"error"}})
+        });
+      }
+      
+      function remove_unit() {
+        var index = $(".clsremoveunit").index(this)
+        ajax_request("/client", "removeunit", "removing unit " + index, function(data) {
+          console.log(data.responseJSON);
+        });
+      }
+      
+      function toggle_unit() {
+        var index = $(".clstoggleunit").index(this);
+        $(".clsunitdiv:eq("+index+")").slideToggle();
+      }
+      
+      function refresh_party() {
+        ajax_request("/client", "getparty", null, function(data) {
+          $("#unittable tr").remove();
+          console.log("The server sent some data!");
+          console.log(data.responseJSON);
+          var party = data.responseJSON.data;
+          if (party == "error") { console.log("Error: Did not receive data from server!"); }
+          else party.unitlist.forEach(function(unit, i) {
+            $("#unittable tbody").append("\
+              <tr>\
+                <td>\
+                  <div>\
+                    <a class='clstoggleunit' href='javascript:void(0)'>"+unit.name+"</a>\
+                  </div>\
+                  <div class='clsunitdiv'>"+
+                    unit._id
+                  +"</div>\
+                </td>\
+                <td>\
+                  <a class='clsequipunit' href='\equip?unitindex=" + i + "'>equip</a>\
+                </td>\
+                <td>\
+                  <a class='clsremoveunit' href='javascript:void(0)'>remove</a>\
+                </td>\
+              </tr>\
+            ");
+          });
+          $(".clstoggleunit").click(toggle_unit);
+          $(".clsremoveunit").click(remove_unit);
+        });
+      }
+      
+      function add_unit() {
+        ajax_request("/client", "addunit", null, function(data) {
+          console.log(data.responseJSON);
+          if (data.responseJSON.header == "newunit") {
+            console.log(data.responseJSON);
+            refresh_party();
+          }
+          else {
+            $("#error").html("Reached maximum users.");
+          }
+        });
+      }
+      
+      $(document).ready(function() {
+        $("#userdata").html("<h2>Welcome, " + userdata.username + ".</h2>");
+        $("#addunitbutton").click(add_unit);
+        $("#refreshpartybutton").click(refresh_party);
+        refresh_party();
+      });
+  body
+    h1 Client
+    #content
+      #userdata
+      a(href="/logout") logout
+      table(id="unittable", border="1")
+        tr
+          td
+            h3 Party
+      button(id="refreshpartybutton") refresh party
+      button(id="addunitbutton") add unit
+    #error
