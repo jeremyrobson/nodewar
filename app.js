@@ -18,19 +18,6 @@ app.set('views', __dirname + '/views');
 app.set('view engine', 'jade');
 app.use(express.static(__dirname + '/public'));
 app.game = game; //not sure if this is best practice...
-app.validate_session = validate_session;  //not sure if this is best practice...
-
-function validate_session(cookie, success, failure) {
-    console.log("--------------SESSION VALIDATION--------------------");
-    console.log(cookie);
-    
-    var user;
-    if (cookie.username && cookie.sessionid)
-        user = game.find_user(cookie.username);
-    
-    if (user && user.sessionid == cookie.sessionid) success(); //already in session
-    else failure();  //no session
-}
 
 function start_server() {
     routes.init(app); //does this call init() for all js files in ./routes folder?
