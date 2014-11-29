@@ -27,7 +27,7 @@ var get_item_template = function(unit) {
     };
 };
 
-var create_item = function(unit, callback) {
+exports.create_item = function(unit, callback) {
     if (unit.equip.length < 10) {
         console.log("-----------------CREATING ITEM----------------------");
         console.log("UNIT", unit);
@@ -48,7 +48,7 @@ var load_items = function(unitids, callback) {
     });
 };
 
-var get_items = function(unit, callback) {
+exports.get_items = function(unit, callback) {
     callback(unit.equip);
 };
 
@@ -77,7 +77,7 @@ var get_unit_template = function(user) {
     };
 };
 
-var create_unit = function(user, callback) {
+exports.create_unit = function(user, callback) {
     if (user.party.unitlist.length < 5) {
         console.log("-----------------CREATING UNIT----------------------");
         console.log("USER", user);
@@ -126,7 +126,7 @@ var get_party_template = function(user) {
     };
 };
 
-var create_party = function(userid, callback) {
+exports.create_party = function(userid, callback) {
     db.add_data("partycollection", get_party_template(userid), function(docs) {
         var newparty = new Party(docs[0]);
         parties.push(newparty);
@@ -153,49 +153,44 @@ var load_party = function(userid, callback) {
     });
 };
 
-var get_party = function(user, callback) {
+exports.get_party = function(user, callback) {
     callback(user.party);
 };
 
 var User = function(doc, party) {
     this.username = doc.username;
     this._id = doc._id;
-    this.sessionid = "";
+    this.sessionid = sessionid = uuid.v1();
     this.party = party;
+    this.messages = [];
     users.push(this);
     console.log("-----------------CURRENT USERS----------------------");
     console.log(users);
 };
 
-var create_user = function(username, password, callback) {
+exports.create_user = function(username, password, callback) {
     db.add_data("usercollection", {"username":username, "password":password}, function(docs) {
         var newuser = new User(docs[0]);
-        newuser.sessionid = uuid.v1();
         callback(newuser);
     });
 };
 
-var find_user = function(username) {
-    return users.filter(function(a) { return username == a.username; })[0];
-};
-
-var remove_user = function(username) {
+exports.remove_user = function(username) {
     console.log("-------------------REMOVING USER---------------------");
     var index = users.map(function(a) { return a.username; }).indexOf(username);
     if (index >= 0) users.splice(index, 1);
     console.log(users);
 };
 
-var get_user = function(username) {
+exports.get_user = function(username) {
     return users.filter(function(a) { return a.username == username; })[0];
 };
 
-var validate_user = function(username, password, success, failure) {
+exports.validate_user = function(username, password, success, failure) {
     db.find("usercollection", {"username": username}, function(docs) {
         if (docs[0] && docs[0].password == password) {
             load_party(docs[0]._id, function(party) {
                 var user = new User(docs[0], party);
-                user.sessionid = uuid.v1();
                 success(user);   
             });
         }
@@ -206,24 +201,24 @@ var validate_user = function(username, password, success, failure) {
     });
 };
 
-var init = function(callback) {
-    db.connect(function() {
-        callback();
+exports.get_users = function(callback) {
+    callback(users.map(function(a) { return a.username; }));
+};
+
+exports.push_message = function(name, message) {
+    users.forEach(function(user) {
+        user.messages.push(name+": "+message+"\n\r");
     });
 };
 
-module.exports = {
-    init: init,
-    create_item: create_item,
-    get_items: get_items,
-    create_unit: create_unit,
-    create_party: create_party,
-    load_party: load_party,
-    create_user: create_user,
-    find_user: find_user,
-    remove_user: remove_user,
-    get_user: get_user,
-    get_party: get_party,
-    validate_user: validate_user,
-    users: users
+exports.pop_messages = function(user, callback) {
+    var text = user.messages.join("");
+    user.messages = [];
+    callback(text);
+};
+
+exports.init = function(callback) {
+    db.connect(function() {
+        callback();
+    });
 };
