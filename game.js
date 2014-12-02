@@ -1,6 +1,7 @@
 var db = require("./database"),
 uuid = require('node-uuid');
 
+var battles = [];
 var users = [];
 var parties = [];
 var units = [];
@@ -42,22 +43,18 @@ exports.create_item = function(unit, callback) {
 };
 
 var load_items = function(unitids, callback) {
-    db.find("itemcollection", {"unitid": {"$in": unitids}}, function(itemdocs) {
-        var itemlist = itemdocs.map(function(doc) { return new Item(doc); });
+    db.find("itemcollection", {"unitid": {"$in": unitids}}, function(docs) {
+        var itemlist = docs.map(function(doc) { return new Item(doc); });
         callback(itemlist);
     });
 };
 
-exports.get_items = function(unit, callback) {
-    callback(unit.equip);
-};
-
-var Unit = function(doc, userid, partyid, itemlist) {
+var Unit = function(doc, userid, partyid) {
     this.name = doc.name;
     this._id = doc._id;
     this.userid = userid || doc.userid;
     this.partyid = partyid || doc.partyid;
-    this.equip = itemlist || [];
+    this.equip = doc.equip || [];
     units.push(this);
 };
 
@@ -91,9 +88,9 @@ exports.create_unit = function(user, callback) {
         callback(false);
 };
 
-var Party = function(data, unitlist) {
-    this._id = data._id;
-    this.userid = data.userid;
+var Party = function(doc, unitlist) {
+    this._id = doc._id;
+    this.userid = doc.userid;
     this.unitlist = unitlist;
     parties.push(this);
 };
@@ -105,48 +102,48 @@ Party.prototype.to_json = function() {
 };
 
 var load_units = function(userid, partyid, callback) {
-    db.find("unitcollection", {"partyid": partyid}, function(unitdocs) {
-        var unitids = unitdocs.map(function(a) { return a._id; }); //get list of unitids
+    db.find("unitcollection", {"partyid": partyid}, function(docs) {
+        var unitlist = [];
+        var unitids = docs.map(function(a) { return a._id; }); //get list of all unitids with partyid
         load_items(unitids, function(itemlist) { //query itemcollection for ALL unitids
-            unitdocs.forEach(function(a) { //sort items into respective units
-                a.equip = itemlist.filter(function(b) {
-                    return a._id == b.unitid;
-                })
+            docs.forEach(function(doc) { //sort items into respective units
+                doc.equip = itemlist.filter(function(item) {
+                    return doc._id.equals(item.unitid); //match unit._id and item.unitid
+                });
+                unitlist.push(new Unit(doc, userid, partyid));
             });
-            var unitlist = unitdocs.map(function(doc) { return new Unit(doc, userid, partyid, itemlist); });
             callback(unitlist);
         });
     });
 };
 
-var get_party_template = function(user) {
+var get_party_template = function(userid) {
     return {
-        "userid": user._id,
+        "userid": userid,
         "gp": 1000
     };
 };
 
-exports.create_party = function(userid, callback) {
+var create_party = function(userid, callback) {
+    console.log("***CREATING NEW PARTY BECAUSE userid WAS NOT FOUND IN partycollection***");
     db.add_data("partycollection", get_party_template(userid), function(docs) {
-        var newparty = new Party(docs[0]);
+        var newparty = new Party(docs[0], []);
         parties.push(newparty);
         callback(newparty);
     });
 };
 
 var load_party = function(userid, callback) {
-    db.find("partycollection", {"userid": userid}, function(partydocs) {
-        if (partydocs.length == 0) { //party not found
-            console.log("***CREATING NEW PARTY BECAUSE userid WAS NOT FOUND IN partycollection***");
+    db.find("partycollection", {"userid": userid}, function(docs) {
+        if (docs.length == 0) { //party not found
             create_party(userid, function(newparty) {
-                var party = new Party(partydocs[0], []);
+                var party = new Party(docs[0], []);
                 callback(party);
             });
         }
         else {
-            var party = new Party(partydocs[0]);
-            load_units(userid, partydocs[0]._id, function(unitlist) {
-                var party = new Party(partydocs[0], unitlist);
+            load_units(userid, docs[0]._id, function(unitlist) {
+                var party = new Party(docs[0], unitlist);
                 callback(party);
             });
         }
@@ -160,9 +157,11 @@ exports.get_party = function(user, callback) {
 var User = function(doc, party) {
     this.username = doc.username;
     this._id = doc._id;
-    this.sessionid = sessionid = uuid.v1();
+    this.sessionid = uuid.v1();
     this.party = party;
     this.messages = [];
+    this.duration = 0;
+    this.lastping = 0;
     users.push(this);
     console.log("-----------------CURRENT USERS----------------------");
     console.log(users);
@@ -195,30 +194,56 @@ exports.validate_user = function(username, password, success, failure) {
             });
         }
         else if (docs[0] && docs[0].password != password)
-            failure(401);
+            failure(401); //password incorrect
         else
-            failure(400);
+            failure(400); //user does not exist
     });
 };
 
-exports.get_users = function(callback) {
-    callback(users.map(function(a) { return a.username; }));
+exports.get_users = function() {
+    return users;
 };
 
-exports.push_message = function(name, message) {
-    users.forEach(function(user) {
+var Battle = function(user) {
+    this._id = uuid.v1();
+    this.userid = user._id;
+    this.name = user.username + this._id;
+    user.battle = this;
+};
+
+exports.create_battle = function(user, callback) {
+    var battle = new Battle(user);
+    callback(battle);
+};
+
+exports.get_battles = function() {
+    return battles;
+};
+
+exports.push_message = function(userlist, name, message) {
+    userlist.forEach(function(user) {
         user.messages.push(name+": "+message+"\n\r");
     });
 };
 
-exports.pop_messages = function(user, callback) {
+exports.pop_messages = function(user) {
     var text = user.messages.join("");
     user.messages = [];
-    callback(text);
+    return text;
 };
 
 exports.init = function(callback) {
     db.connect(function() {
         callback();
+    });
+};
+
+exports.loop = function() {
+    users.forEach(function(a) {
+        a.duration++;
+        if (a.duration > a.lastping + 20)
+            users.forEach(function(b) {
+                b.messages.push(a.username + " has timed out and been disconnected.");
+            });
     });
 };
