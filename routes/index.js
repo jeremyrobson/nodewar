@@ -1,53 +1,48 @@
-exports.init = function(app) {
+exports.init = function(app, express) {
+    var router = express.Router();
 
-    var validate_session = function(cookie, success, failure) {
-        console.log("--------------SESSION VALIDATION--------------------");
-        console.log(cookie);
-        
-        var user;
-        if (cookie.username && cookie.sessionid)
-            user = app.game.get_user(cookie.username);
-        
-        if (user && user.sessionid == cookie.sessionid) success(user); //already in session
-        else failure();  //no session
-    };
-
-    app.get(["/", "/index", "/login"], function(req, res) {       
-        validate_session(req.cookies, function(user) {
-            res.redirect("/client");
-        }, function() {
-            res.render("login", {});
-        });
-    });
-
+    //must go before middleware
     app.post(["/", "/index", "/login"], function(req, res) {
         var username = req.body.usernameinput;
         var password  = req.body.passwordinput;
         app.game.validate_user(username, password, function(user) { //user found
             res.cookie("username", username);
             res.cookie("sessionid", user.sessionid);
-            res.redirect("http://" + req.headers.host + "/client");
+            res.redirect("/client");
         },
         function(errorcode) {
             if (errorcode == 401) //password incorrect
-                render(res, pages["login"].template, {"error":"Username/Password incorrect!"});
+                res.render("login", {"error":"Username/Password incorrect!"});
             else if (errorcode == 400) //user does not exist
                 app.game.create_user(username, password, function(user) {
                     res.cookie("username", username);
                     res.cookie("sessionid", user.sessionid);
-                    res.redirect("http://" + req.headers.host + "/client");
+                    res.redirect("/client");
                 });
         });
     });
     
+     //routing middleware for user/session verification
+    app.use(function(req, res, next) {
+        if (req.cookies.username && req.cookies.sessionid)
+            req.user = app.game.get_user(req.cookies.username);
+        
+        if (!req.user)
+            res.render("login", {});
+        else if (req.user.sessionid != req.cookies.sessionid)
+            res.render("login", {"error":"Your session has expired!"});
+        else
+            next(); //already in session
+    });
+
+    app.get(["/", "/index", "/login"], function(req, res) {
+        res.redirect("client");
+    });
+    
     app.get("/logout", function(req, res) {
-        validate_session(req.cookies, function(user) {
-            console.log(user.username + " is logging out");
-            app.game.remove_user(user.username);
-            res.render("logout", "");
-        }, function() {
-            res.render("login", {"header":"error", "data":"Not logged in!"});
-        });
+        console.log(req.user.username + " is logging out.");
+        app.game.remove_user(req.user.username);
+        res.render("logout", "");
     });
     
     app.get("/client", function(req, res) {
@@ -55,41 +50,61 @@ exports.init = function(app) {
         var ajaxdata = (query.jsonData) ? JSON.parse(query.jsonData) : 0;
         var success;
         
-        if (ajaxdata && ajaxdata.header == "getusers") {
+        if (ajaxdata && ajaxdata.header == "ping") {
             success = function(user) {
-                app.game.get_users(function(users) {
-                    res.send({"header":"users", "data":users});
+                user.lastping = user.duration;
+                var users = app.game.get_users();
+                var usernames = users.map(function(a) {return a.username; });
+                var battles = app.game.get_battles();
+                var battlenames = battles.map(function(a) {return a.name; });
+                var messagetext = app.game.pop_messages(user);
+                res.send({"header":"update", "data":{"usernames": usernames, "battlenames":battlenames, "text":messagetext}});
+            };
+        }
+        else if (ajaxdata && ajaxdata.header == "createbattle") {
+            success = function(user) {
+                app.game.create_battle(user, function(battle) {
+                    res.send({"header":"message", "data":battle});
                 });
             };
         }
         else if (ajaxdata && ajaxdata.header == "chattext") {
             success = function(user) {
                 console.log("GOT MESSAGE", ajaxdata.data);
-                app.game.push_message(user.username, ajaxdata.data);
-                res.send({"header":"chattext", "data":"success"}); //finish request
+                var users = app.game.get_users();
+                app.game.push_message(users, user.username, ajaxdata.data);
+                res.send({"header":"chattext", "data":"message sent"}); //finish request
             };
         }
-        else if (ajaxdata && ajaxdata.header == "getmessages") {
+        else
             success = function(user) {
-                console.log("USER REQUESTED MESSAGES");
-                app.game.pop_messages(user, function(text) {
-                    console.log("SENDING MESSAGE", text);
-                    res.send({"header":"chattext", "data":text});
-                });
-            };
-        }
-        else //if no ajaxdata, send userdata
-            success = function(user) {
-                app.game.push_message("SYSTEM", "Welcome to nodewar1 chat.");
+                app.game.push_message([user], "SYSTEM", "Welcome to nodewar1 chat.");
+                var users = app.game.get_users();
+                app.game.push_message(users, "SYSTEM", user.username + " entered the chat.");
                 res.render("client", {userdata:JSON.stringify(user)});
             };
         
-        validate_session(req.cookies, success, function() {
-            res.render("login", {"header":"error", "data":"Not logged in!"});
-        });
+        success(req.user);
+    });
+    
+    app.get(["/user/:user", "/user/:user/unit/:unit", "/user/:user/unit/:unit/item/:item"], function(req, res) {
+        console.log(req.params, req.query);
+        var user = app.game.get_user(req.params.user);
+        console.log(req.params.user, parseInt(req.params.unit), parseInt(req.params.item));
+        var unit = (user && typeof parseInt(req.params.unit) == "number") ? user.party.unitlist[req.params.unit] : null;
+        var item = (unit && typeof parseInt(req.params.item) == "number") ? unit.equip[req.params.item] : null;
+        
+        if (req.params.item)
+            res.send(JSON.stringify(item));
+        else if (req.params.unit)
+            res.send(JSON.stringify(unit));
+        else if (req.params.user)
+            res.send(JSON.stringify(user));
     });
     
     app.get("/user", function(req, res) {
+        console.log("PARAMETERS!!!! ", req.params);
+        console.log("WHATTTT PART 2!!!", req.what);
         var query = req.query;
         var ajaxdata = (query.jsonData) ? JSON.parse(query.jsonData) : 0;
         var success;
@@ -120,9 +135,7 @@ exports.init = function(app) {
                 res.render("user", {userdata:JSON.stringify(user)});
             };
 
-        validate_session(req.cookies, success, function() {
-            res.render("login", {"header":"error", "data":"Your session has expired!"});
-        });
+        success();
     });
     
     app.get("/equip", function(req, res) {
@@ -143,9 +156,7 @@ exports.init = function(app) {
         else if (ajaxdata && ajaxdata.header == "getitems") {
             success = function(user) {
                 var unit = (user) ? user.party.unitlist[index] : null;
-                app.game.get_items(unit, function(itemlist) {
-                    res.send({"header":"itemlist", "data":itemlist});
-                });
+                res.send({"header":"itemlist", "data":unit.equip});
             };
         }
         else if (ajaxdata && ajaxdata.header == "dropitem") {
@@ -166,8 +177,7 @@ exports.init = function(app) {
                 var unit = (user) ? user.party.unitlist[index] : null;
                 res.render("equip", {unitdata: JSON.stringify(unit), unitindex: index});
             };
-        validate_session(cookie, success, function() {
-            res.render("login", {"header":"error", "data":"Your session has expired!"});
-        });
+        
+        success();
     });
 };
