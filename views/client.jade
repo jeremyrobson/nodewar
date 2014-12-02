@@ -11,6 +11,7 @@ html(lang="en")
     script(type='text/javascript').
       var userdata = !{userdata};
       var chattext = "";
+      var battle = null;
       var interval;
       
       function ajax_request(url, header, data, callback) {
@@ -25,6 +26,18 @@ html(lang="en")
         });
       }
       
+      function create_battle() {
+        ajax_request("/client", "createbattle", text, function(data) {
+          console.log("The server sent some data!");
+          console.log(data.responseJSON);
+          if (data.responseJSON.header != "error") {
+            battle = (data.responseJSON) ? data.responseJSON.data : 0;
+            if (!battle) { console.log("Error: Could not parse ajax response!"); }
+            else console.log("You have signed up for battle " + battle.name);
+          };
+        });
+      }
+      
       function send_message() {
         var text = $("#inputbox").val();
         $("#inputbox").val("");
@@ -34,41 +47,41 @@ html(lang="en")
         });
       }
       
-      function get_messages() {
-        ajax_request("/client", "getmessages", null, function(data) {
-          console.log("The server sent some data!");
-          console.log(data.responseJSON);
-          if (data.responseJSON.header != "error") {
-            chattext += data.responseJSON.data;
-            $("#chat").val(chattext);
-            $('#chat').scrollTop($('#chat')[0].scrollHeight);
-          }
-        });
-      }
-      
-      function refresh_users() {
-        ajax_request("/client", "getusers", null, function(data) {
+      function ping_server() {
+        ajax_request("/client", "ping", null, function(data) {
           $("#users option").remove();
           console.log("The server sent some data!");
           console.log(data.responseJSON);
           if (data.responseJSON.header != "error") {
-            var userlist = (data.responseJSON) ? data.responseJSON.data : 0;
-            if (!userlist || userlist == "error") { console.log("Error: Could not parse ajax response!"); }
-            else userlist.forEach(function(username, i) {
+            var chat = (data.responseJSON) ? data.responseJSON.data : 0;
+            var userlist = chat.usernames || []; //usernames
+            userlist.forEach(function(username, i) {
               $("#users").append("\
                 <option value=" + i + ">" + username + "</option>\
               ");
             });
+            var battlelist = chat.battlenames || []; //battlenames
+            battlelist.forEach(function(battlename, i) {
+              $("#games").append("\
+                <option value=" + i + ">" + battlename + "</option>\
+              ");
+            });
+            var messagelist = chat.messages || []; //messages
+            chattext += chat.text;
+            $("#chat").val(chattext);
+            $('#chat').scrollTop($('#chat')[0].scrollHeight);
           }
+          else
+            console.log("There was an error communicating with the server.");
         });
       }
       
       $(document).ready(function() {
         $("#sendbutton").click(send_message);
+        $("#newbattlebutton").click(create_battle);
         $("#chat").val(chattext);
-        refresh_users();
-        get_messages();
-        interval = window.setInterval(get_messages, 5000);
+        ping_server();
+        interval = window.setInterval(ping_server, 5000);
       });
   body
     h1 Client
@@ -77,11 +90,21 @@ html(lang="en")
       table(id="unittable", border="1")
         tr
           td
+            h3 chat
+          td
+            h3 users
+          td
+            h3 battles
+        tr
+          td
             textarea(id="chat" rows="10" cols="50")
           td
             select(id="users" multiple)
+          td
+            select(id="battles")
         tr
           td(rowspan="2")
             input(id="inputbox")
       button(id="sendbutton") send
+      button(id="newbattlebutton") new battle
     #error
