@@ -1,0 +1,105 @@
+doctype html
+html(lang="en")
+  head
+    title= pageTitle
+    style(type='text/css').
+      #error {
+        font-size: 15px;
+        color: #ff0000;
+      }
+      
+      .clsitemdiv {
+        display: none;
+      }
+      
+    script(type='text/javascript', src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js')
+    script(type='text/javascript').
+    
+      var userdata = !{userdata};
+      var unitdata = !{unitdata};
+      var itemdata = !{itemdata};
+      var unitindex = !{unitindex};
+      var itemindex = !{itemindex};
+      
+      function ajax_request(header, data, callback) {
+        $.ajax({
+          type: 'GET',
+          url: '/ajax',
+          data: { jsonData: JSON.stringify({"header":header, "data": data}) },
+          dataType: 'json',
+          complete: callback
+        });
+      }
+      
+      function toggle_item() {
+        var index = $(".clstoggleitem").index(this);
+        $(".clsitemdiv:eq("+index+")").slideToggle();
+      }
+      
+      function refresh_items() {
+        ajax_request("getdata", {"unitindex":unitindex, "itemindex":itemindex}, function(data, textStatus, errorThrown) {
+          $("#itemtable tr").remove();
+          console.log("The server sent some data!");
+          console.log("textStatus:", textStatus);
+          console.log("errorThrown:", errorThrown);
+          data = data.responseJSON.data;
+          userdata = JSON.parse(data.userdata);
+          unitdata = JSON.parse(data.unitdata);
+          itemdata = JSON.parse(data.itemdata);
+          if (!userdata) { console.log("Error: Did not receive userdata from server!"); }
+          else unitdata.equip.forEach(function(item, i) {
+            $("#itemtable tbody").append("\
+              <tr>\
+                <td>\
+                  <div>\
+                    <a class='clstoggleitem' href='javascript:void(0)'>"+item.name+"</a>\
+                  </div>\
+                  <div class='clsitemdiv'>"+
+                    item._id
+                  +"</div>\
+                </td>\
+                <td>\
+                  <a class='clsdropitem' href='javascript:void(0)'>drop</a>\
+                </td>\
+                <td>\
+                  <a class='clsremoveitem' href='javascript:void(0)'>remove</a>\
+                </td>\
+              </tr>\
+            ");
+          });
+          $(".clstoggleitem").click(toggle_item);
+          //$(".clsdrop").click(drop_item);
+          //$(".clsremoveitem").click(remove_item);
+        });
+      }
+      
+      function add_item() {
+        ajax_request("/equip?unitindex="+unitindex, "additem", null, function(data) {
+          if (data.responseJSON.header == "newitem") {
+            console.log(data.responseJSON);
+            refresh_items();
+          }
+          else {
+            $("#error").html("Reached maximum items.");
+          }
+        });
+      }
+      
+      $(document).ready(function() {
+        $("#unitdata").html("<h2>Unit data for " + unitdata.name + ".</h2>");
+        $("#additembutton").click(add_item);
+        $("#refreshitemsbutton").click(refresh_items);
+        refresh_items();
+      });
+  body
+    h1 Client
+    #content
+      #unitdata
+      #[a(href="/client") back] | #[a(href="/logout") logout]
+      table(id="itemtable", border="1")
+        tr
+          td
+            h3 Inventory
+      button(id="refreshitemsbutton") refresh inventory
+      button(id="additembutton") add item
+    #error
