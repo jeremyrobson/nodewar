@@ -150,10 +150,6 @@ var load_party = function(userid, callback) {
     });
 };
 
-exports.get_party = function(user, callback) {
-    callback(user.party);
-};
-
 var User = function(doc, party) {
     this.username = doc.username;
     this._id = doc._id;
@@ -178,7 +174,7 @@ exports.remove_user = function(username) {
     console.log("-------------------REMOVING USER---------------------");
     var index = users.map(function(a) { return a.username; }).indexOf(username);
     if (index >= 0) users.splice(index, 1);
-    console.log(users);
+    console.log("Current users: ", users);
 };
 
 exports.get_user = function(username) {
@@ -241,9 +237,9 @@ exports.init = function(callback) {
 exports.loop = function() {
     users.forEach(function(a) {
         a.duration++;
-        if (a.duration > a.lastping + 20)
-            users.forEach(function(b) {
-                b.messages.push(a.username + " has timed out and been disconnected.");
-            });
+        if (a.duration > a.lastping + 20) {
+            exports.push_message(users, "SYSTEM", a.username + " has timed out and been disconnected.");
+            exports.remove_user(a.username);
+        }
     });
 };
