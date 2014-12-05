@@ -14,10 +14,10 @@ html(lang="en")
       var battle = null;
       var interval;
       
-      function ajax_request(url, header, data, callback) {
+      function ajax_request(header, data, callback) {
         $.ajax({
           type: 'GET',
-          url: url,
+          url: '/ajax',
           data: { jsonData: JSON.stringify({"header":header, "data": data}) },
           dataType: 'json',
           complete: callback,
@@ -27,7 +27,7 @@ html(lang="en")
       }
       
       function create_battle() {
-        ajax_request("/client", "createbattle", text, function(data) {
+        ajax_request("createbattle", text, function(data) {
           console.log("The server sent some data!");
           console.log(data.responseJSON);
           if (data.responseJSON.header != "error") {
@@ -41,14 +41,14 @@ html(lang="en")
       function send_message() {
         var text = $("#inputbox").val();
         $("#inputbox").val("");
-        ajax_request("/client", "chattext", text, function(data) {
+        ajax_request("chattext", text, function(data) {
           console.log("The server sent some data!");
           console.log(data.responseJSON);
         });
       }
       
       function ping_server() {
-        ajax_request("/client", "ping", null, function(data) {
+        ajax_request("ping", null, function(data) {
           $("#users option").remove();
           console.log("The server sent some data!");
           console.log(data.responseJSON);
