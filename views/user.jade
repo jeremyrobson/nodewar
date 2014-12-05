@@ -14,22 +14,27 @@ html(lang="en")
       
     script(type='text/javascript', src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js')
     script(type='text/javascript').
+    
       var userdata = !{userdata};
+      var unitdata = !{unitdata};
+      var itemdata = !{itemdata};
+      var unitindex = !{unitindex};
+      var itemindex = !{itemindex};
       
-      function ajax_request(url, header, data, callback) {
+      function ajax_request(header, data, callback) {
         $.ajax({
           type: 'GET',
-          url: url,
+          url: "/ajax",
           data: { jsonData: JSON.stringify({"header":header, "data": data}) },
           dataType: 'json',
           complete: callback,
-          error: callback({"responseJSON":{"data":"error"}})
+          error: callback
         });
       }
       
       function remove_unit() {
         var index = $(".clsremoveunit").index(this)
-        ajax_request("/user", "removeunit", "removing unit " + index, function(data) {
+        ajax_request("removeunit", "removing unit " + index, function(data) {
           console.log(data.responseJSON);
         });
       }
@@ -40,13 +45,17 @@ html(lang="en")
       }
       
       function refresh_party() {
-        ajax_request("/user", "getparty", null, function(data) {
+        ajax_request("getdata", {"unitindex":unitindex, "itemindex":itemindex}, function(data, textStatus, errorThrown) {
           $("#unittable tr").remove();
           console.log("The server sent some data!");
-          console.log(data.responseJSON);
-          var party = data.responseJSON.data;
-          if (party == "error") { console.log("Error: Did not receive data from server!"); }
-          else party.unitlist.forEach(function(unit, i) {
+          console.log("textStatus:", textStatus);
+          console.log("errorThrown:", errorThrown);
+          data = data.responseJSON.data;
+          userdata = JSON.parse(data.userdata);
+          unitdata = JSON.parse(data.unitdata);
+          itemdata = JSON.parse(data.itemdata);
+          if (!userdata) { console.log("Error: Did not receive userdata from server!"); }
+          else userdata.party.unitlist.forEach(function(unit, i) {
             $("#unittable tbody").append("\
               <tr>\
                 <td>\
@@ -58,7 +67,7 @@ html(lang="en")
                   +"</div>\
                 </td>\
                 <td>\
-                  <a class='clsequipunit' href='\equip?unitindex=" + i + "'>equip</a>\
+                  <a class='clsequipunit' href='/user/" + userdata.username + "/unit/" + i + "'>equip</a>\
                 </td>\
                 <td>\
                   <a class='clsremoveunit' href='javascript:void(0)'>remove</a>\
@@ -72,7 +81,7 @@ html(lang="en")
       }
       
       function add_unit() {
-        ajax_request("/user", "addunit", null, function(data) {
+        ajax_request("addunit", null, function(data) {
           console.log(data.responseJSON);
           if (data.responseJSON.header == "newunit") {
             console.log(data.responseJSON);
