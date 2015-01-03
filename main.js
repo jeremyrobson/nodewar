@@ -1,8 +1,11 @@
 var game;
 Array.prototype.pop_random = function() { var r = Math.floor(Math.random() * this.length); return this.splice(r, 1)[0]; };
 function rand(min, max) { return Math.floor(Math.random() * (max - min)) + min; }
-var Item = function() {
+var Item = function(name, range, spread) {
     this._id = 0;
+    this.name = name;
+    this.range = range;
+    this.spread = spread;
 };
 var Unit = function(color) {
     this._id = rand(100000,1000000);
@@ -15,13 +18,13 @@ var Unit = function(color) {
     this.def = stats.pop_random();
     this.agl = stats.pop_random();
     this.mag = stats.pop_random();
-    this.range = stats.pop_random();
+    this.moverange = stats.pop_random();
     
     this.at = 0;
     this.equip = [
-        new Item(),
-        new Item(),
-        new Item()
+        new Item("Sword", 1, 1),
+        new Item("Bow", 5, 1),
+        new Item("Fire", 3, 2)
     ];
 };
 Unit.prototype.move = function(dest) {
@@ -38,10 +41,11 @@ var Party = function(color) {
         new Unit(color)
     ];
 };
-var User = function(username) {
+var User = function(username, ai) {
     this._id = 0;
     this.username = username;
-    this.color = "rgb(" + rand(0,256) + "," + rand(50,256) + "," + rand(50,256) + ")";
+    this.ai = ai;
+    this.color = (ai) ? "rgb(255,0,0)" : "rgb(0,255,0)";
     this.party = new Party(this.color);
 };
 var Battle = function(user1, user2) {
@@ -54,7 +58,9 @@ var Battle = function(user1, user2) {
         for (var y=0;y<16;y++) {
             this.tile[x][y] = {
                 "type": "grass",
-                "unit": null
+                "unit": null,
+                "x": x,
+                "y": y
             };
         }
     }
@@ -142,6 +148,7 @@ Battle.prototype.end_battle = function() {
     window.clearInterval(interval);
 };
 Battle.prototype.loop = function() {
+    /*
     if (this.activeunit) {
         if (this.activeunit.at <= 0) {
             this.activeunit = null;
@@ -157,6 +164,25 @@ Battle.prototype.loop = function() {
     }
     else
         this.activeunit = this.get_next_turn();
+    */
+};
+Battle.prototype.mouse_down = function(mx, my) {
+    var tx = Math.floor(mx/32);
+    var ty = Math.floor(my/32);
+    this.seltile = this.tile[tx][ty];
+    this.selunit = this.seltile.unit;
+    
+    if (this.selunit) {
+        var selectmenu = document.getElementById("selectmenu");
+        selectmenu.onchange = function() { console.log(selectmenu.selectedIndex); };
+        selectmenu.innerHTML = "";
+        this.selunit.equip.forEach(function(e, i) {
+            var ele = document.createElement("option");
+            ele.setAttribute("value", i);
+            ele.innerHTML = e.name;
+            selectmenu.appendChild(ele);
+        });
+    }
 };
 Battle.prototype.draw = function(ctx) {
     for (var x=0;x<16;x++) {
@@ -165,9 +191,15 @@ Battle.prototype.draw = function(ctx) {
             ctx.fillRect(x*32,y*32,31,31);
         }
     }
+    
     if (this.activeunit) {
         ctx.fillStyle = "rgba(0,255,255,0.75)";
         ctx.fillRect(this.activeunit.x*32, this.activeunit.y*32, 32, 32);
+    }
+    
+    if (this.selunit) {
+        ctx.fillStyle = "rgba(0,0,255,0.75)";
+        ctx.fillRect(this.selunit.x*32, this.selunit.y*32, 32, 32);
     }
     
     if (this.target) {
