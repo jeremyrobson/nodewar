@@ -13,12 +13,16 @@ function draw() {
     context.fillRect(0,0,512,512);
     game.battle.draw(context);
 }
+function canvas_mouse_down(e) {
+    game.battle.mouse_down(e.offsetX, e.offsetY);
+}
 window.onload = function() {
     canvas = document.getElementById("canvas");
+    canvas.onmousedown = canvas_mouse_down;
     context = canvas.getContext("2d");
     
     game = {};
-    game.users = [new User("jeremy"), new User("bobaloo")];
+    game.users = [new User("jeremy"), new User("bobaloo", "cpu")];
     game.battle = new Battle(game.users[0], game.users[1]);
     
     interval = window.setInterval(loop, 1000/10);
@@ -27,5 +31,9 @@ window.onload = function() {
 </head>
 <body>
 <canvas id="canvas" width="512" height="512"></canvas>
+<div id="menu1">
+<select id="selectmenu">
+</select>
+</div>
 </body>
 </html>
