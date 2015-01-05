@@ -1,6 +1,17 @@
 <!doctype html>
 <html>
 <head>
+<title>awefa</title>
+<style>
+div {
+    border: 2px solid;
+}
+
+.menu {
+    display: none;
+}
+</style>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
 <script src="main.js"></script>
 <script>
 var canvas, context, interval;
@@ -22,7 +33,7 @@ window.onload = function() {
     context = canvas.getContext("2d");
     
     game = {};
-    game.users = [new User("jeremy"), new User("bobaloo", "cpu")];
+    game.users = [new User("jeremy", "player"), new User("cpu", "cpu")];
     game.battle = new Battle(game.users[0], game.users[1]);
     
     interval = window.setInterval(loop, 1000/10);
@@ -30,10 +41,26 @@ window.onload = function() {
 </script>
 </head>
 <body>
-<canvas id="canvas" width="512" height="512"></canvas>
-<div id="menu1">
-<select id="selectmenu">
-</select>
-</div>
+<table>
+ <tr>
+  <td>
+   <canvas id="canvas" width="512" height="512"></canvas>
+  </td>
+  <td>
+   <div class="menu" id="menu1">
+    <input type="radio" id="menulevel1radio0" class="menulevel1" name="menulevel1" value="move"><label for="menulevel1radio0">move</label><br>
+    <input type="radio" id="menulevel1radio1" class="menulevel1" name="menulevel1" value="act"><label for="menulevel1radio1">act</label><br>
+    <button id="menulevel1button0">defend</button><br>
+    <button id="menulevel1button1">done</button>
+   </div>
+   <div class="menu" id="menu2"></div>
+   <div class="menu" id="menu3">
+    Are you sure?<br>
+    <button id="menulevel3button0">yes</button><br>
+    <button id="menulevel3button1">no</button><br>
+   </div>
+  </td>
+ </tr>
+</table>
 </body>
 </html>
