@@ -1,12 +1,18 @@
 var game;
 Array.prototype.pop_random = function() { var r = Math.floor(Math.random() * this.length); return this.splice(r, 1)[0]; };
-function rand(min, max) { return Math.floor(Math.random() * (max - min)) + min; }
+function randint(min, max) { return Math.floor(Math.random() * (max - min)) + min; }
 var TileTypes = {
+    "sky": {
+        color: "rgb(100,200,255)"
+    },
     "grass": {
-        walkable: 1,
         color: "rgb(50,125,75)"
     }
 };
+function draw_tile(ctx, x, y, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x*20,y*15,19,14);
+}
 var Tile = function(type, x, y) {
     this.type = type;
     this.unit = null;
@@ -14,8 +20,51 @@ var Tile = function(type, x, y) {
     this.y = y;
 };
 Tile.prototype.draw = function(ctx) {
-    ctx.fillStyle = TileTypes[this.type].color;
-    ctx.fillRect(this.x*32,this.y*32,31,31);
+    draw_tile(ctx,this.x,this.y,TileTypes[this.type].color);
+};
+var Map = function() {
+    var heights = [];
+    heights[0] = [randint(12,24),randint(12,24)];
+    for (var i=1; i<6; i++) {
+        heights[i] = [];
+        var max = Math.pow(2,i);
+        for (var x=0;x<max;x++)
+            heights[i][x] = heights[i-1][Math.floor(x/2)] + randint(0,3) - 1;
+    }
+
+    this.height = [];
+    for (var x=0;x<32;x++) {
+        this.height[x] = {
+            unit: null,
+            x: x,
+            y: heights[5][x]
+        };
+    }
+    this.tile = [];
+    for (var x=0;x<32;x++) {
+        this.tile[x] = [];
+        for (var y=0;y<this.height[x].y;y++) {
+            this.tile[x][y] = new Tile("sky", x, y);
+        }
+        for (var y=this.height[x].y; y<32; y++) {
+            this.tile[x][y] = new Tile("grass", x, y);
+        }
+    }
+};
+Map.prototype.move_unit = function(unit, x) {
+    if (this.height[unit.x] && this.height[unit.x].unit)
+        this.height[unit.x].unit = null; //remove unit from current tile
+        
+    this.height[x].unit = unit; //move unit to new tile
+    unit.x = x;
+    unit.y = this.height[x].y;
+};
+Map.prototype.draw = function(ctx) {
+    for (var x=0;x<32;x++) {
+        for (var y=0;y<32;y++) {
+            this.tile[x][y].draw(ctx);
+        }
+    }
 };
 var Item = function(name, range, spread) {
     this._id = 0;
@@ -24,7 +73,7 @@ var Item = function(name, range, spread) {
     this.spread = spread;
 };
 var Unit = function(ai, color) {
-    this._id = rand(100000,1000000);
+    this._id = randint(100000,1000000);
     this.ai = ai;
     this.color = color;
     
@@ -75,27 +124,17 @@ var Battle = function(user1, user2) {
     var self = this;
     
     this.history = [];
-    this.tile = [];
-    for (var x=0;x<16;x++) {
-        this.tile[x] = [];
-        for (var y=0;y<16;y++) {
-            this.tile[x][y] = new Tile("grass", x, y);
-        }
-    }
+    this.map = new Map();
     
     this.units = user1.party.units.concat(user2.party.units);
     var positionlist = [];
-    for (var x=0; x<16; x++) {
-        for (var y=0; y<16; y++) {
-            positionlist.push({"x":x,"y":y});
-        }
-    }
+    for (var x=0; x<32; x++)
+        positionlist.push(x);
+
     this.units.forEach(function(unit) {
-        var r = rand(0, positionlist.length);
-        var p = positionlist.splice(r, 1)[0];
-        unit.x = p.x;
-        unit.y = p.y;
-        self.tile[unit.x][unit.y].unit = unit;
+        var r = randint(0, positionlist.length);
+        var x = positionlist.splice(r, 1)[0];
+        self.map.move_unit(unit, x);
     });
     
     $(".menulevel1").click(function() {
@@ -241,9 +280,9 @@ Battle.prototype.loop = function() {
 Battle.prototype.mouse_down = function(mx, my) {
     var self = this;
 
-    var tx = Math.floor(mx/32);
-    var ty = Math.floor(my/32);
-    this.seltile = this.tile[tx][ty];
+    var tx = Math.floor(mx/20);
+    var ty = Math.floor(my/15);
+    this.seltile = this.map.height[tx];
     
     if (!this.selunit) {
         this.selunit = this.seltile.unit;
@@ -288,50 +327,37 @@ Battle.prototype.mouse_down = function(mx, my) {
     }
 };
 Battle.prototype.draw = function(ctx) {
-    for (var x=0;x<16;x++) {
-        for (var y=0;y<16;y++) {
-            this.tile[x][y].draw(ctx);
-        }
-    }
+    this.map.draw(ctx);
     
     if (this.movelist) {
         this.movelist.forEach(function(m) {
-            ctx.fillStyle = "rgba(0,255,255,0.75)";
-            ctx.fillRect(m[0]*32,m[1]*32,32,32);
+            draw_tile(ctx,m[0],m[1],"rgba(0,255,255,0.75)");
         });
     }
     
     if (this.rangelist) {
         this.rangelist.forEach(function(r) {
-            ctx.fillStyle = "rgba(255,0,0,0.75)";
-            ctx.fillRect(r[0]*32,r[1]*32,32,32);
+            draw_tile(ctx,r[0],r[1],"rgba(255,0,0,0.75)");
         });
     }
     
     if (this.spreadlist) {
         this.spreadlist.forEach(function(s) {
-            ctx.fillStyle = "rgba(0,255,0,0.75)";
-            ctx.fillRect(s[0]*32,s[1]*32,32,32);
+            draw_tile(ctx,ctx,s[0],s[1],"rgba(0,255,0,0.75)");
         });
     }
     
-    if (this.activeunit) {
-        ctx.fillStyle = "rgba(0,255,255,0.75)";
-        ctx.fillRect(this.activeunit.x*32, this.activeunit.y*32, 32, 32);
-    }
+    if (this.activeunit)
+        draw_tile(ctx,this.activeunit.x,this.activeunit.y,"rgba(200,255,55,0.75)");
     
-    if (this.selunit) {
-        ctx.fillStyle = "rgba(0,0,255,0.75)";
-        ctx.fillRect(this.selunit.x*32, this.selunit.y*32, 32, 32);
-    }
+    if (this.selunit)
+        draw_tile(ctx,this.selunit.x,this.selunit.y,"rgba(0,0,255,0.75)");
     
-    if (this.target) {
-        ctx.fillStyle = "rgba(0,255,0,0.75)";
-        ctx.fillRect(this.target.unit.x*32,this.target.unit.y*32,32,32);
-    }
+    if (this.target)
+        draw_tile(ctx,this.target.unit.x,this.target.unit.y,"rgba(0,255,0,0.75)");
     
     this.units.forEach(function(unit) {
         ctx.fillStyle = unit.color;
-        ctx.fillRect(unit.x * 32 + 8, unit.y * 32 - 16, 16, 32);
+        ctx.fillRect(unit.x * 20 + 5, unit.y * 15 - 15, 10, 16);
     });
 };
