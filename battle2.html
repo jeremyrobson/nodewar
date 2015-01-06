@@ -6,7 +6,6 @@
 div {
     border: 2px solid;
 }
-
 .menu {
     display: none;
 }
@@ -21,7 +20,7 @@ function loop() {
 }
 function draw() {
     context.fillStyle = "rgb(0,0,0)";
-    context.fillRect(0,0,512,512);
+    context.fillRect(0,0,canvas.width,canvas.height);
     game.battle.draw(context);
 }
 function canvas_mouse_down(e) {
@@ -44,7 +43,7 @@ window.onload = function() {
 <table>
  <tr>
   <td>
-   <canvas id="canvas" width="512" height="512"></canvas>
+   <canvas id="canvas" width="640" height="480"></canvas>
   </td>
   <td>
    <div class="menu" id="menu1">
